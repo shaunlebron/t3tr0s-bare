@@ -14,8 +14,11 @@ pom.xml
 /.nrepl-port
 
 /public/out/
+/public/game.js
 
 .DS_Store
 
 # ignore diffs
 *.diff
+
+
