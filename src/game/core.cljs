@@ -72,6 +72,8 @@
 (def pause-grav (chan))
 (def resume-grav (chan))
 
+(def paused? (atom false))
+
 ;;------------------------------------------------------------
 ;; STATE MONITOR
 ;;------------------------------------------------------------
@@ -278,6 +280,25 @@
 ;; Input-driven STATE CHANGES
 ;;------------------------------------------------------------
 
+(defn resume-game!
+  "Restores the state of the board pre-pausing, and resumes gravity"
+  []
+  (put! resume-grav 0)
+  (reset! paused? false))
+
+(defn pause-game!
+  "Saves the current state of the board, loads the game-over animation and pauses gravity"
+  []
+  (put! pause-grav 0)
+  (reset! paused? true))
+
+(defn toggle-pause-game!
+  "Toggles pause on the game board"
+  []
+  (if @paused?
+    (resume-game!)
+    (pause-game!)))
+
 (defn try-move!
   "Try moving the current piece to the given offset."
   [dx dy]
@@ -315,7 +336,8 @@
   39 :right
   40 :down
   32 :space
-  16 :shift})
+  16 :shift
+  80 :p})
 
 (defn add-key-events
   "Add all the key inputs."
@@ -340,6 +362,7 @@
                    :left (swap! key-states assoc :left false)
                    :right (swap! key-states assoc :right false)
                    :down  (put! down-chan false)
+                   :p (toggle-pause-game!)
                    nil)
                  (when (#{:left :right} (key-name e))
                    ; force gravity to reset
