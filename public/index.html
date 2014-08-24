@@ -1,12 +1,47 @@
 
 <!doctype html>
 <html>
+<head>
+<style>
+body {
+  background: #EEE;
+}
+table {
+  border-collapse: collapse;
+}
+td {
+  margin: 0;
+  padding: 0;
+}
+#game-canvas {
+  padding: 10px;
+  background: #FFF;
+}
+#side-bar {
+  padding: 10px;
+  padding-left: 0;
+  background: #FFF;
+}
+</style>
+</head>
 <body>
-<canvas id="next-canvas"></canvas>
-<div id="score"></div>
-<div id="level"></div>
-<div id="lines"></div>
-<canvas id="game-canvas"></canvas>
+<center>
+<table>
+<tr>
+  <td>
+    <canvas id="game-canvas"></canvas>
+  </td>
+  <td valign=top>
+    <div id="side-bar">
+      <canvas id="next-canvas"></canvas>
+      <div id="score"></div>
+      <div id="level"></div>
+      <div id="lines"></div>
+    </div>
+  </td>
+</tr>
+</table>
+</center>
 
 <script src="jquery.js"></script>
 <script src="game.js"></script>
