@@ -27,7 +27,9 @@
                         tower-height]]
     [game.rules :refer [get-points
                         level-up?
-                        get-level-speed]]
+                        grav-speed
+                        initial-shift-speed
+                        shift-speed]]
     [game.paint :refer [size-canvas!
                         cell-size
                         draw-board!]]
@@ -45,16 +47,9 @@
   "The state of the game."
   (atom nil))
 
-(def key-states
-  "The state of the directional keys."
-  (atom nil))
-
 (defn init-state!
   "Set the initial state of the game."
   []
-  (reset! key-states {:left false
-                      :right false
-                      :down false})
   (reset! state {:next-piece nil
                  :piece nil
                  :position nil
@@ -68,11 +63,57 @@
                  :soft-drop false
                  }))
 
-; required for pausing/resuming the gravity routine
-(def pause-grav (chan))
-(def resume-grav (chan))
-
 (def paused? (atom false))
+
+; required for pausing/resuming the gravity routine
+(declare go-go-gravity!)
+
+(def stop-grav (chan))
+(defn stop-gravity! []
+  (put! stop-grav 0))
+
+(defn refresh-gravity! []
+  (stop-gravity!)
+  (go-go-gravity!))
+
+;;------------------------------------------------------------------------------
+;; Piece Control Throttling
+;;------------------------------------------------------------------------------
+
+; These channels can received boolean signals indicating on/off status.
+; Duplicate signals are ignored with the (dedupe) transducer.
+(def move-left-chan (chan 1 (dedupe)))
+(def move-right-chan (chan 1 (dedupe)))
+(def move-down-chan (chan 1 (dedupe)))
+
+(defn go-go-control-soft-drop!
+  "Monitor move-down-chan to update the gravity speed."
+  []
+  (go-loop []
+    (swap! state assoc :soft-drop (<! move-down-chan))
+    (refresh-gravity!)
+    (recur)))
+
+(declare try-move!)
+
+(defn go-go-piece-shift!
+  "Shifts a piece in the given direction until given channel is closed."
+  [stop-chan dx]
+  (go-loop [speed initial-shift-speed]
+    (try-move! dx 0)
+    (let [[value c] (alts! [stop-chan (timeout speed)])]
+      (when-not (= c stop-chan)
+        (recur shift-speed)))))
+
+(defn go-go-control-piece-shift!
+  "Monitors the given shift-chan to control piece-shifting."
+  [shift-chan dx]
+  (go-loop [stop-chan (chan)]
+    (recur (if (<! shift-chan)
+             (do (go-go-piece-shift! stop-chan dx)
+                 stop-chan)
+             (do (close! stop-chan)
+                 (chan))))))
 
 ;;------------------------------------------------------------
 ;; STATE MONITOR
@@ -128,7 +169,7 @@
     (swap! state assoc :piece piece
                        :position start-position)
 
-    (put! resume-grav 0))
+    (go-go-gravity!))
 
 (defn try-spawn-piece!
   "Checks if new piece can be written to starting position."
@@ -146,7 +187,7 @@
         ; Show piece that we attempted to spawn, drawn behind the other pieces.
         ; Then pause before kicking off gameover animation.
         (swap! state update-in [:board] #(write-piece-behind-board piece x y %))
-        (<! (timeout (get-level-speed (:level @state))))
+        (<! (timeout (grav-speed (:level @state))))
         (go-go-game-over!)))))
 
 (defn display-points!
@@ -219,7 +260,7 @@
     (swap! state assoc :board new-board
                        :piece nil
                        :soft-drop false) ; reset soft drop
-    (put! pause-grav 0)
+    (stop-gravity!)
 
     ; If collapse routine returns a channel...
     ; then wait for it before spawning a new piece.
@@ -244,37 +285,12 @@
 (defn go-go-gravity!
   "Starts the gravity routine."
   []
-  ; Make sure gravity starts in paused mode.
-  ; Spawning the piece will signal the first "resume".
-  (put! pause-grav 0)
-
   (go-loop []
-    (let [soft-speed 35
-          level-speed (get-level-speed (:level @state))
-
-          ; only soft-drop if we're currently not shifting
-          shifting (or (:left @key-states) (:right @key-states))
-          soft-drop (and (not shifting) (:soft-drop @state))
-
-          speed (if soft-drop
-                  (min soft-speed level-speed)
-                  level-speed)
-          time-chan (timeout speed)
-          [_ c] (alts! [time-chan pause-grav])]
-
-      (condp = c
-
-        pause-grav
-        (do (<! resume-grav)
-            (recur))
-
-        time-chan
-        (do
-          (apply-gravity!)
-          (recur))
-
-        nil))))
-
+    (let [speed (grav-speed (:level @state) (:soft-drop @state))
+          [_ c] (alts! [(timeout speed) stop-grav])]
+      (when-not (= c stop-grav)
+        (apply-gravity!)
+        (recur)))))
 
 ;;------------------------------------------------------------
 ;; Input-driven STATE CHANGES
@@ -283,13 +299,13 @@
 (defn resume-game!
   "Restores the state of the board pre-pausing, and resumes gravity"
   []
-  (put! resume-grav 0)
+  (go-go-gravity!)
   (reset! paused? false))
 
 (defn pause-game!
   "Saves the current state of the board, loads the game-over animation and pauses gravity"
   []
-  (put! pause-grav 0)
+  (stop-gravity!)
   (reset! paused? true))
 
 (defn toggle-pause-game!
@@ -342,16 +358,15 @@
 (defn add-key-events
   "Add all the key inputs."
   []
-  (let [down-chan (chan)
-        key-name #(-> % .-keyCode key-names)
+  (let [key-name #(-> % .-keyCode key-names)
         key-down (fn [e]
                    (case (key-name e)
                      nil)
                    (when (:piece @state)
                      (case (key-name e)
-                       :down  (put! down-chan true)
-                       :left  (do (try-move! -1  0) (swap! key-states assoc :left true))
-                       :right (do (try-move!  1  0) (swap! key-states assoc :right true))
+                       :down  (put! move-down-chan true)
+                       :left  (put! move-left-chan true)
+                       :right (put! move-right-chan true)
                        :space (hard-drop!)
                        :up    (try-rotate!)
                        nil))
@@ -359,36 +374,16 @@
                      (.preventDefault e)))
         key-up (fn [e]
                  (case (key-name e)
-                   :left (swap! key-states assoc :left false)
-                   :right (swap! key-states assoc :right false)
-                   :down  (put! down-chan false)
+                   :down  (put! move-down-chan false)
+                   :left  (put! move-left-chan false)
+                   :right (put! move-right-chan false)
                    :p (toggle-pause-game!)
                    nil)
-                 (when (#{:left :right} (key-name e))
-                   ; force gravity to reset
-                   (put! pause-grav 0)
-                   (put! resume-grav 0))
                  )]
 
     ; Add key events
     (.addEventListener js/window "keydown" key-down)
     (.addEventListener js/window "keyup" key-up)
-
-    ; Prevent the player from holding the down-key
-    ; for more than one piece-drop.
-    ;
-    ; The soft-drop state is set to:
-    ;   = the state of the down-key when it CHANGES
-    ;   = off, after a piece is locked
-    (let [uc (unique down-chan)]
-      (go-loop []
-        (let [value (<! uc)]
-          (swap! state assoc :soft-drop value))
-
-        ; force gravity to reset
-        (put! pause-grav 0)
-        (put! resume-grav 0)
-        (recur)))
 
     ))
 
@@ -402,13 +397,17 @@
 
   (init-state!)
 
+  (go-go-control-soft-drop!)
+  (go-go-control-piece-shift! move-left-chan -1)
+  (go-go-control-piece-shift! move-right-chan 1)
+  
+
   (size-canvas! "game-canvas" empty-board cell-size rows-cutoff)
   (size-canvas! "next-canvas" (next-piece-board) cell-size)
 
   (try-spawn-piece!)
   (add-key-events)
   (go-go-draw!)
-  (go-go-gravity!)
 
   (display-points!)
   )
