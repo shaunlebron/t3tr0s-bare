@@ -28,14 +28,14 @@ game state without gravity progressing the game.
 Go into the game's core namespace:
 
 ```
-> (ns game.core)
+> (in-ns game.core)
 ```
 
 You can set the current piece to use any of the following keys `:I :T :O :Z :S
 :J :L`.  The letters represent the shapes of the canonical pieces.
 
 ```
-> (swap! state assoc (:I game.board/pieces))
+> (swap! state assoc :piece (:I game.board/pieces))
 ```
 
 Go back to your game to see how the piece changed to the line-piece.  You can
