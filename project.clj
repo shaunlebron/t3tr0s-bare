@@ -16,12 +16,7 @@
   :cljsbuild {:builds [{:id "dev"
                         :source-paths ["src"]
                         :figwheel true
-                        :compiler {
-                                   :main game.core
-                                   ;; :output-to "public/game.js"
-                                   ;; :output-dir "public/out"
-                                   ;; :optimizations :whitespace
-                                   }}
+                        :compiler {:main game.core}}
                        {:id "prod"
                         :source-paths ["src/game"]
                         :compiler {:optimizations :advanced
