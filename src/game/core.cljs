@@ -2,7 +2,7 @@
   (:require-macros
     [cljs.core.async.macros :refer [go go-loop alt!]])
   (:require
-    [weasel.repl :as repl]
+    ;; [weasel.repl :as repl]
     [cljs.reader :refer [read-string]]
     [game.board :refer [piece-fits?
                         rotate-piece
@@ -393,7 +393,7 @@
 
 (defn init []
 
-  (repl/connect "ws://localhost:9001")
+  ;; (repl/connect "ws://localhost:9001")
 
   (init-state!)
 
