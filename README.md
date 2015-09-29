@@ -10,17 +10,12 @@ and simplicity of its code before features become a priority.  Oh, and it's in
 ## Setup
 
 1. Install [Leiningen](http://leiningen.org)
-1. Run `lein cljsbuild auto` to run the auto-compiler.
-1. Play the game by opening `public/index.html`
+1. Run `lein figwheel dev`.
+1. Open <http://localhost:3449>.
 
 ## Play with the REPL
 
-You can start a REPL for interacting with the running game with:
-
-```
-lein repl
-> (brepl)
-```
+Use Figwheel's REPL for interacting with the running game with:
 
 __Press "P" in-game to pause the gravity__.  This allows us to play with the
 game state without gravity progressing the game.
@@ -28,7 +23,7 @@ game state without gravity progressing the game.
 Go into the game's core namespace:
 
 ```
-> (in-ns game.core)
+> (in-ns 'game.core)
 ```
 
 You can set the current piece to use any of the following keys `:I :T :O :Z :S
