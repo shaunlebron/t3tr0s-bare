@@ -1,4 +1,4 @@
-(ns game.core
+(ns ^:figwheel-always game.core
   (:require-macros
     [cljs.core.async.macros :refer [go go-loop alt!]])
   (:require
