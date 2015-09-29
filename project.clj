@@ -1,27 +1,15 @@
 (defproject t3tr0s "0.1.0-SNAPSHOT"
-
-  :dependencies [[org.clojure/clojure "1.6.0"]
-                 [org.clojure/clojurescript "0.0-2311"]
-                 [org.clojure/core.async "0.1.338.0-5c5012-alpha"]
-                 [com.cemerick/piggieback "0.1.3"]
-                 [weasel "0.4.0-SNAPSHOT"]]
-
-  :plugins [[lein-cljsbuild "1.0.3"]]
-
+  :dependencies [[org.clojure/clojure "1.7.0"]
+                 [org.clojure/clojurescript "1.7.122"]
+                 [org.clojure/core.async "0.1.346.0-17112a-alpha"]]
+  :plugins [[lein-figwheel "0.4.0"]]
+  :figwheel {:nrepl-port 7888}
   :source-paths ["src"]
-
-  :cljsbuild { 
-    :builds {
-      :game {
-        :source-paths ["src/game"]
-        :compiler {
-          :output-to "public/game.js"
-          :output-dir "public/out"
-          :optimizations :whitespace}}
-     }}
-
-  :repl-options {:nrepl-middleware [cemerick.piggieback/wrap-cljs-repl]}
-  :injections [(require 'weasel.repl.websocket)
-               (def brepl #(cemerick.piggieback/cljs-repl :repl-env (weasel.repl.websocket/repl-env)))]
-
-  )
+  :clean-targets ^{:protect false} [:target-path "public/out" "public/game.js"]
+  :cljsbuild {:builds [{:id "dev"
+                        :source-paths ["src"]
+                        :figwheel true
+                        :compiler {:main game.core
+                                   :asset-path "out"
+                                   :output-to "public/game.js"
+                                   :output-dir "public/out"}}]})
