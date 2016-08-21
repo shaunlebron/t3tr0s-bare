@@ -13,8 +13,8 @@ pom.xml
 /.repl
 /.nrepl-port
 
-/public/out/
-/public/game.js
+/resources/public/out/
+/resources/public/game.js
 
 .DS_Store
 
