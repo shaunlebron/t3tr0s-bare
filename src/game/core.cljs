@@ -59,8 +59,7 @@
                  :level-lines 0
                  :total-lines 0
 
-                 :soft-drop false
-                 }))
+                 :soft-drop false}))
 
 (def paused? (atom false))
 
@@ -85,7 +84,7 @@
 (def move-right-chan (chan 1 (dedupe)))
 (def move-down-chan (chan 1 (dedupe)))
 
-(defn go-go-control-soft-drop!
+(defn manage-soft-drop!
   "Monitor move-down-chan to update the gravity speed."
   []
   (go-loop []
@@ -95,7 +94,7 @@
 
 (declare try-move!)
 
-(defn go-go-piece-shift!
+(defn animate-piece-shift!
   "Shifts a piece in the given direction until given channel is closed."
   [stop-chan dx]
   (go-loop [speed initial-shift-speed]
@@ -104,15 +103,15 @@
       (when-not (= c stop-chan)
         (recur shift-speed)))))
 
-(defn go-go-control-piece-shift!
+(defn manage-piece-shift!
   "Monitors the given shift-chan to control piece-shifting."
   [shift-chan dx]
-  (go-loop [stop-chan (chan)]
-    (recur (if (<! shift-chan)
-             (do (go-go-piece-shift! stop-chan dx)
-                 stop-chan)
-             (do (close! stop-chan)
-                 (chan))))))
+  (let [stop-chan (chan)]
+    (go-loop []
+      (if (<! shift-chan)
+        (animate-piece-shift! stop-chan dx)
+        (put! stop-chan 0))
+      (recur))))
 
 ;;------------------------------------------------------------
 ;; STATE MONITOR
@@ -165,10 +164,10 @@
 (defn spawn-piece!
   "Spawns the given piece at the starting position."
   [piece]
-    (swap! state assoc :piece piece
-                       :position start-position)
+  (swap! state assoc :piece piece
+                     :position start-position)
 
-    (go-go-gravity!))
+  (go-go-gravity!))
 
 (defn try-spawn-piece!
   "Checks if new piece can be written to starting position."
@@ -193,8 +192,8 @@
   []
   (.html ($ "#score") (str "Score: " (:score @state)))
   (.html ($ "#level") (str "Level: " (:level @state)))
-  (.html ($ "#lines") (str "Lines: " (:total-lines @state)))
-  )
+  (.html ($ "#lines") (str "Lines: " (:total-lines @state))))
+
 
 (defn update-points!
   [rows-cleared]
@@ -212,8 +211,8 @@
         (swap! state assoc :level-lines 0))
       (swap! state assoc :level-lines level-lines))
 
-    (swap! state update-in [:total-lines] + n)
-    )
+    (swap! state update-in [:total-lines] + n))
+
 
   (display-points!))
 
@@ -346,13 +345,13 @@
     (lock-piece!)))
 
 (def key-names {
-  37 :left
-  38 :up
-  39 :right
-  40 :down
-  32 :space
-  16 :shift
-  80 :p})
+                37 :left
+                38 :up
+                39 :right
+                40 :down
+                32 :space
+                16 :shift
+                80 :p})
 
 (defn add-key-events
   "Add all the key inputs."
@@ -377,14 +376,14 @@
                    :left  (put! move-left-chan false)
                    :right (put! move-right-chan false)
                    :p (toggle-pause-game!)
-                   nil)
-                 )]
+                   nil))]
+
 
     ; Add key events
     (.addEventListener js/window "keydown" key-down)
-    (.addEventListener js/window "keyup" key-up)
+    (.addEventListener js/window "keyup" key-up)))
 
-    ))
+
 
 ;;------------------------------------------------------------
 ;; Entry Point
@@ -394,10 +393,10 @@
 
   (init-state!)
 
-  (go-go-control-soft-drop!)
-  (go-go-control-piece-shift! move-left-chan -1)
-  (go-go-control-piece-shift! move-right-chan 1)
-  
+  (manage-soft-drop!)
+  (manage-piece-shift! move-left-chan -1)
+  (manage-piece-shift! move-right-chan 1)
+
 
   (size-canvas! "game-canvas" empty-board cell-size rows-cutoff)
   (size-canvas! "next-canvas" (next-piece-board) cell-size)
@@ -406,7 +405,7 @@
   (add-key-events)
   (go-go-draw!)
 
-  (display-points!)
-  )
+  (display-points!))
+
 
 ($ init)
